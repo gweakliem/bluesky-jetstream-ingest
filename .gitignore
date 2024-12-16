@@ -1,0 +1,7 @@
+scratch/
+
+# build artifacts
+.pytest_cache/
+venv/
+__pycache__/
+jetstream_ingestion.egg-info/
