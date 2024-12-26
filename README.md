@@ -44,13 +44,23 @@ Optional arguments:
 
 ## Installation
 
+```
 pip install -e .
+```
 
 ## Running the application
 
+Using the local file system for output:
+
+```
 jetstream-ingest ./scratch  # For local output
-### or
-jetstream-ingest gs://bucket-name/path  # For GCS output
+```
+
+or for GCS output
+
+```
+jetstream-ingest gs://bucket-name/path
+```
 
 ## Output Format
 
