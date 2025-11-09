@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Jetstream ingestion service
+  ingestor:
+    build: .
+    container_name: jetstream-ingestor
+    volumes:
+      # Mount data directory for DuckDB database persistence
+      - ./data:/data
+      # Mount source code for development (hot-reload)
+      - ./jetstream_ingestion:/app/jetstream_ingestion
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: jetstream-ingest /data/jetstream.db --batch-size 1000
+    restart: unless-stopped
+    networks:
+      - jetstream-net
+
+  # DuckDB CLI service for querying the database
+  duckdb-cli:
+    build: .
+    container_name: duckdb-cli
+    volumes:
+      - ./data:/data
+    working_dir: /data
+    entrypoint: ["python", "-c"]
+    command: |
+      "import duckdb;
+      conn = duckdb.connect('/data/jetstream.db', read_only=True);
+      print('DuckDB CLI - Database:', conn.execute('SELECT COUNT(*) as count FROM jetstream_messages').fetchone());
+      conn.close()"
+    profiles:
+      - tools
+    networks:
+      - jetstream-net
+
+networks:
+  jetstream-net:
+    driver: bridge
+
+volumes:
+  data:

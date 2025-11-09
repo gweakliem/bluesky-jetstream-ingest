@@ -2,53 +2,83 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Union
+import logging
 
-import pandas as pd
-from google.cloud import storage
+import duckdb
 
-class ParquetWriter:
-    def __init__(self, output_path: Union[str, Path]):
-        """Initialize the Parquet writer.
-        
+logger = logging.getLogger(__name__)
+
+class DuckDBWriter:
+    def __init__(self, db_path: Union[str, Path], table_name: str = "jetstream_messages"):
+        """Initialize the DuckDB writer.
+
         Args:
-            output_path: Local directory or GCS bucket path for output
+            db_path: Path to the DuckDB database file
+            table_name: Name of the table to create/use (default: jetstream_messages)
         """
-        self.output_path = str(output_path)
-        self.is_gcs = self.output_path.startswith('gs://')
-        
-        if self.is_gcs:
-            self.gcs_client = storage.Client()
-            self.bucket_name = self.output_path.split('/')[2]
-            self.gcs_prefix = '/'.join(self.output_path.split('/')[3:])
-            self.bucket = self.gcs_client.bucket(self.bucket_name)
-        else:
-            os.makedirs(self.output_path, exist_ok=True)
+        self.db_path = str(db_path)
+        self.table_name = table_name
+
+        # Ensure parent directory exists
+        parent_dir = os.path.dirname(self.db_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        # Connect to DuckDB and create table if it doesn't exist
+        self.conn = duckdb.connect(self.db_path)
+        self._create_table()
+
+    def _create_table(self):
+        """Create the jetstream messages table if it doesn't exist."""
+        create_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {self.table_name} (
+            receivedTimestamp TIMESTAMP,
+            payload VARCHAR
+        )
+        """
+        self.conn.execute(create_table_sql)
+        logger.info(f"Table {self.table_name} ready in database {self.db_path}")
 
     def write_batch(self, messages: List[Dict]):
-        """Write a batch of messages to Parquet.
-        
+        """Write a batch of messages to DuckDB.
+
         Args:
             messages: List of message dictionaries with receivedTimestamp and payload
         """
         if not messages:
             return
 
-        df = pd.DataFrame(messages)
-        
-        # Generate filename with timestamp
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-        filename = f"jetstream_{timestamp}.parquet"
-        
-        if self.is_gcs:
-            # Write to temporary file then upload to GCS
-            temp_path = f"/tmp/{filename}"
-            df.to_parquet(temp_path, index=False)
-            
-            blob_path = os.path.join(self.gcs_prefix, filename)
-            blob = self.bucket.blob(blob_path)
-            blob.upload_from_filename(temp_path)
-            os.remove(temp_path)
-        else:
-            # Write directly to local filesystem
-            output_file = os.path.join(self.output_path, filename)
-            df.to_parquet(output_file, index=False)
+        try:
+            # Prepare data for insertion
+            # Convert ISO format timestamps to proper timestamp format
+            insert_data = [
+                (msg['receivedTimestamp'], msg['payload'])
+                for msg in messages
+            ]
+
+            # Insert using executemany for better performance
+            insert_sql = f"""
+            INSERT INTO {self.table_name} (receivedTimestamp, payload)
+            VALUES (?, ?)
+            """
+            self.conn.executemany(insert_sql, insert_data)
+
+            logger.debug(f"Inserted {len(messages)} messages into {self.table_name}")
+
+        except Exception as e:
+            logger.error(f"Error writing batch to DuckDB: {e}")
+            raise
+
+    def close(self):
+        """Close the DuckDB connection."""
+        if self.conn:
+            self.conn.close()
+            logger.info("DuckDB connection closed")
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
