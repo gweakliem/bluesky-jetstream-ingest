@@ -2,29 +2,44 @@
 
 A Python application for ingesting Bluesky's [Jetstream API](https://github.com/bluesky-social/jetstream) data and writing it to Parquet format.
 
+## Prerequisites
+
+This project uses [uv](https://github.com/astral-sh/uv) for Python package management. Install uv first:
+
+```bash
+# On macOS and Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# On Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or with pip
+pip install uv
+```
+
 ## Installation
 
 1. Clone the repository
-2. Create a virtual environment:
+2. Install dependencies and create a virtual environment:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   uv sync
    ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+
+This will automatically:
+- Create a virtual environment in `.venv/`
+- Install all project dependencies
+- Install the package in editable mode
 
 ## Usage
 
 Run the ingestor with a local output directory:
 ```bash
-python -m src.ingestor /path/to/output/dir
+uv run jetstream-ingest /path/to/output/dir
 ```
 
 Or with a GCS bucket:
 ```bash
-python -m src.ingestor gs://bucket-name/path
+uv run jetstream-ingest gs://bucket-name/path
 ```
 
 Optional arguments:
@@ -32,35 +47,24 @@ Optional arguments:
 
 ## Development
 
-1. Install development dependencies:
+1. Install with development dependencies:
    ```bash
-   pip install -r requirements.txt
+   uv sync --dev
    ```
 
 2. Run tests:
    ```bash
-   pytest tests/
+   uv run pytest tests/
    ```
 
-## Installation
+3. Add new dependencies:
+   ```bash
+   # Add a runtime dependency
+   uv add <package-name>
 
-```
-pip install -e .
-```
-
-## Running the application
-
-Using the local file system for output:
-
-```
-jetstream-ingest ./scratch  # For local output
-```
-
-or for GCS output
-
-```
-jetstream-ingest gs://bucket-name/path
-```
+   # Add a development dependency
+   uv add --dev <package-name>
+   ```
 
 ## Output Format
 
