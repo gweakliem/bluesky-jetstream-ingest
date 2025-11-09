@@ -5,3 +5,10 @@ scratch/
 venv/
 __pycache__/
 jetstream_ingestion.egg-info/
+*.egg-info/
+dist/
+build/
+
+# uv
+.venv/
+uv.lock
