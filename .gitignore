@@ -1,4 +1,4 @@
-scratch/
+.vscode/
 
 # build artifacts
 .pytest_cache/
@@ -12,3 +12,6 @@ build/
 # uv
 .venv/
 uv.lock
+
+# Testing output
+data/
