@@ -24,12 +24,7 @@ services:
     volumes:
       - ./data:/data
     working_dir: /data
-    entrypoint: ["python", "-c"]
-    command: |
-      "import duckdb;
-      conn = duckdb.connect('/data/jetstream.db', read_only=True);
-      print('DuckDB CLI - Database:', conn.execute('SELECT COUNT(*) as count FROM jetstream_messages').fetchone());
-      conn.close()"
+    entrypoint: ["bash","-c","/root/.duckdb/cli/latest/duckdb"]
     profiles:
       - tools
     networks:
