@@ -26,6 +26,7 @@ build-backend = "hatchling.build"
 
 [tool.uv]
 dev-dependencies = [
+    "pandas>=2.3.3",
     "pytest>=7.4.3",
     "pytest-asyncio>=0.21.1",
 ]
