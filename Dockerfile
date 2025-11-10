@@ -4,6 +4,13 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \ 
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN curl https://install.duckdb.org | sh
+RUN echo 'export PATH='/root/.duckdb/cli/latest':$PATH' >> ~/.bashrc
+
 # Install uv package manager
 RUN pip install uv
 
