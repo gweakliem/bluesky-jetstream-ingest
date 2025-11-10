@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Jetstream ingestion service
   ingestor:
@@ -17,14 +15,35 @@ services:
     networks:
       - jetstream-net
 
-  # DuckDB CLI service for querying the database
-  duckdb-cli:
+  # DuckDB query service - queries a copy to avoid lock conflicts
+  query:
     build: .
-    container_name: duckdb-cli
+    container_name: duckdb-query
     volumes:
       - ./data:/data
     working_dir: /data
-    entrypoint: ["bash","-c","/root/.duckdb/cli/latest/duckdb -readonly /data/jetstream.db"]
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      "echo 'Creating read-only snapshot...' && \
+       cp /data/jetstream.db /tmp/jetstream_snapshot.db && \
+       python3 -c \"
+import duckdb
+conn = duckdb.connect('/tmp/jetstream_snapshot.db', read_only=True)
+print('\n=== Database Stats ===')
+result = conn.execute('''
+    SELECT
+        COUNT(*) as total_messages,
+        MIN(receivedTimestamp) as first_message,
+        MAX(receivedTimestamp) as last_message
+    FROM jetstream_messages
+''').fetchall()
+print(f'Total messages: {result[0][0]:,}')
+print(f'First: {result[0][1]}')
+print(f'Last: {result[0][2]}')
+print('\n=== Recent Messages ===')
+conn.execute('SELECT receivedTimestamp, LEFT(payload, 80) as payload FROM jetstream_messages ORDER BY receivedTimestamp DESC LIMIT 5').show()
+conn.close()
+\""
     profiles:
       - tools
     networks:
@@ -33,6 +52,3 @@ services:
 networks:
   jetstream-net:
     driver: bridge
-
-volumes:
-  data:
