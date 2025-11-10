@@ -8,7 +8,7 @@ WORKDIR /app
 RUN pip install uv
 
 # Copy project files
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY jetstream_ingestion ./jetstream_ingestion/
 
 # Install dependencies using uv
