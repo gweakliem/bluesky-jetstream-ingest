@@ -1,0 +1,54 @@
+services:
+  # Jetstream ingestion service
+  ingestor:
+    build: .
+    container_name: jetstream-ingestor
+    volumes:
+      # Mount data directory for DuckDB database persistence
+      - ./data:/data
+      # Mount source code for development (hot-reload)
+      - ./jetstream_ingestion:/app/jetstream_ingestion
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: jetstream-ingest /data/jetstream.db --batch-size 1000
+    restart: unless-stopped
+    networks:
+      - jetstream-net
+
+  # DuckDB query service - queries a copy to avoid lock conflicts
+  query:
+    build: .
+    container_name: duckdb-query
+    volumes:
+      - ./data:/data
+    working_dir: /data
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      "echo 'Creating read-only snapshot...' && \
+       cp /data/jetstream.db /tmp/jetstream_snapshot.db && \
+       python3 -c \"
+import duckdb
+conn = duckdb.connect('/tmp/jetstream_snapshot.db', read_only=True)
+print('\n=== Database Stats ===')
+result = conn.execute('''
+    SELECT
+        COUNT(*) as total_messages,
+        MIN(receivedTimestamp) as first_message,
+        MAX(receivedTimestamp) as last_message
+    FROM jetstream_messages
+''').fetchall()
+print(f'Total messages: {result[0][0]:,}')
+print(f'First: {result[0][1]}')
+print(f'Last: {result[0][2]}')
+print('\n=== Recent Messages ===')
+conn.execute('SELECT receivedTimestamp, LEFT(payload, 80) as payload FROM jetstream_messages ORDER BY receivedTimestamp DESC LIMIT 5').show()
+conn.close()
+\""
+    profiles:
+      - tools
+    networks:
+      - jetstream-net
+
+networks:
+  jetstream-net:
+    driver: bridge

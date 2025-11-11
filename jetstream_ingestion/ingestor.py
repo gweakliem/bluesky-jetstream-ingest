@@ -8,27 +8,27 @@ from pathlib import Path
 from typing import Optional, Union
 
 import websockets
-from .writer import ParquetWriter
+from .writer import DuckDBWriter
 from .utils import setup_logging, parse_args
 
 logger = logging.getLogger(__name__)
 
 class JetstreamIngestor:
-    def __init__(self, output_path: Union[str, Path], batch_size: int = 1000):
+    def __init__(self, db_path: Union[str, Path], batch_size: int = 1000):
         """Initialize the Jetstream ingestor.
-        
+
         Args:
-            output_path: Local directory or GCS bucket path for output
+            db_path: Path to the DuckDB database file
             batch_size: Number of records to batch before writing
         """
-        self.output_path = str(output_path)
+        self.db_path = str(db_path)
         self.batch_size = batch_size
-        self.writer = ParquetWriter(self.output_path)
+        self.writer = DuckDBWriter(self.db_path)
         self.running = True
         self.messages = []
         self.websocket = None
         self._shutdown_event = asyncio.Event()
-        
+
         # Setup signal handlers
         signal.signal(signal.SIGINT, self.handle_shutdown)
         signal.signal(signal.SIGTERM, self.handle_shutdown)
@@ -68,7 +68,7 @@ class JetstreamIngestor:
 
     async def connect(self, uri: str = "wss://jetstream2.us-east.bsky.network/subscribe"):
         """Connect to Jetstream websocket and begin processing messages.
-        
+
         Args:
             uri: Websocket URI for Jetstream
         """
@@ -91,18 +91,19 @@ class JetstreamIngestor:
                 if self.running:
                     await asyncio.sleep(5)  # Wait before reconnecting
 
-        # Final flush of messages
-        await self.flush_messages()                        
+        # Final flush of messages and close writer
+        await self.flush_messages()
+        self.writer.close()                        
             
 
-async def run_ingestor(output_path: Union[str, Path], batch_size: int = 1000):
+async def run_ingestor(db_path: Union[str, Path], batch_size: int = 1000):
     """Run the ingestor process.
-    
+
     Args:
-        output_path: Path to write output files
+        db_path: Path to DuckDB database file
         batch_size: Number of records to batch before writing
     """
-    ingestor = JetstreamIngestor(output_path, batch_size)
+    ingestor = JetstreamIngestor(db_path, batch_size)
     await ingestor.connect()
 
 def main():

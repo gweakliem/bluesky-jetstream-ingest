@@ -11,11 +11,11 @@ def setup_logging():
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Ingest Jetstream data to Parquet files')
+    parser = argparse.ArgumentParser(description='Ingest Jetstream data to DuckDB')
     parser.add_argument(
         'output_path',
         type=str,
-        help='Output path (local directory or GCS bucket)'
+        help='Path to DuckDB database file (e.g., data/jetstream.db)'
     )
     parser.add_argument(
         '--batch-size',
